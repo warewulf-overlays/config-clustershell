@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+
+# Author: griznog
+# Purpose: Helper to parse WW4 node config for clustershell groups.
+
+import os, sys, argparse
+import yaml
+
+def nodes_config(cfgfile):
+    with open(os.path.join(cfgfile)) as w:
+        data = yaml.load(w, Loader=yaml.Loader)
+    return data
+
+group_types = [ 'tag', 'profile', 'cluster' ]
+
+if __name__ == "__main__":
+    
+    # Parse Command line arguments or set defaults.
+    parser = argparse.ArgumentParser(description='Warewulf node config clush helper.')
+    group_flags = parser.add_mutually_exclusive_group()
+    group_flags.add_argument('--map', '-m', 
+                             dest='map', 
+                             type = str, 
+                             default=None, 
+                             help = "Return list of node in group MAP where MAP is group_type[:name=value].")
+    group_flags.add_argument('--all', '-a', 
+                             dest='all', 
+                             action='store_true', 
+                             default=False, 
+                             help = "Return all nodes.")
+    group_flags.add_argument('--list', '-l', 
+                             dest='list', 
+                             action = 'store_true',
+                             default=False, 
+                             help = "Return all node groups for the given --group-type.")
+    group_flags.add_argument('--reverse', '-r', 
+                             dest='reverse', 
+                             type = str, 
+                             default=False, 
+                             help = "Return groups for node REVERSE.")
+
+    parser.add_argument('--group-type', '-g', 
+                        dest = 'group_type', 
+                        type = str,
+                        default = None,
+                        help = "Group type, must be one of %s" % ','.join(group_types))
+
+    parser.add_argument('--config', '-c', dest='configfile', default='/etc/warewulf/nodes.conf', help = "Path to nodes.conf file.")
+
+    args = parser.parse_args()
+    
+    # Verify we got a valid group type or that it is empty.
+    group_type = args.group_type 
+    if group_type is not None and group_type not in group_types:
+        sys.stderr.write("Invalid group type: %s" % group_type,)
+        parser.print_help()
+        sys.exit(1)
+
+    # Collect the node config.
+    config = nodes_config(args.configfile)
+    nodes = config['nodes']
+    profiles = config['nodeprofiles']
+    if args.map:
+        if group_type == 'profile':
+            result = [ node for node in nodes.keys() if args.map in nodes[node]['profiles'] ]
+        elif group_type == 'cluster':
+            result = [ node for node in nodes.keys() if args.map == nodes[node]['cluster name'] ]
+        elif group_type == 'tag':
+            result = []
+            for node in nodes.keys():
+                try:
+                    for tag in nodes[node]['tags'].keys():
+                        if args.map == tag + '=' + nodes[node]['tags'][tag]:
+                            result.append(node)
+                            continue
+                except KeyError:
+                    pass
+            result = list(set(result))
+        else:
+            sys.stderr.write("--map requires --group-type.")
+            parser.print_help()
+            sys.exit(1)
+
+    elif args.all:
+        # Should this care about group_type?
+        result = nodes.keys()
+    elif args.list:
+        if group_type == 'profile':
+            result = profiles.keys()
+        elif group_type == 'cluster':
+            clusters = []
+            for node in nodes.keys():
+                try: 
+                    clusters.append(nodes[node]['cluster name'])
+                except KeyError:
+                    pass
+            result = list(set(clusters))
+        elif group_type == 'tag':
+            tags = []
+            for node in nodes.keys():
+                try:
+                    for tag in nodes[node]['tags'].keys():
+                        tags.append(tag + '=' + nodes[node]['tags'][tag])
+                except KeyError:
+                    pass
+            result = list(set(tags))
+        else:
+            sys.stderr.write("--list requires --group-type.")
+            parser.print_help()
+            sys.exit(1)
+                
+    elif args.reverse:
+        if group_type == 'profile':
+            try:
+                result = nodes[args.reverse]['profiles']
+            except KeyError:
+                result = []
+        elif group_type == 'cluster':
+            try:
+                result = nodes[args.reverse]['cluster name']
+            except KeyError:
+                result = []
+        elif group_type == 'tag':
+            result = []
+            for tag in nodes[args.reverse]['tags']:
+                result.append(tag + '=' + node['tags'][tag])
+        else:
+            sys.stderr.write("--reverse requires --group-type.")
+            parser.print_help()
+            sys.exit(1)
+    else:
+        parser.print_help()
+        sys.exit(1)
+    
+    if result is not None and len(result) > 0:
+        print(' '.join(result))
+    
+    
