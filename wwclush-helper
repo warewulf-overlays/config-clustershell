@@ -22,7 +22,8 @@ if __name__ == "__main__":
                              dest='map', 
                              type = str, 
                              default=None, 
-                             help = "Return list of node in group MAP where MAP is group_type[:name=value].")
+                             metavar = 'GROUP',
+                             help = "Return list of nodes in group GROUP.")
     group_flags.add_argument('--all', '-a', 
                              dest='all', 
                              action='store_true', 
@@ -36,13 +37,15 @@ if __name__ == "__main__":
     group_flags.add_argument('--reverse', '-r', 
                              dest='reverse', 
                              type = str, 
-                             default=False, 
-                             help = "Return groups for node REVERSE.")
+                             default=None,
+                             metavar = 'NODENAME',
+                             help = "Return groups for node NODENAME.")
 
     parser.add_argument('--group-type', '-g', 
                         dest = 'group_type', 
                         type = str,
                         default = None,
+                        metavar = 'GROUP_TYPE',
                         help = "Group type, must be one of %s" % ','.join(group_types))
 
     parser.add_argument('--config', '-c', dest='configfile', default='/etc/warewulf/nodes.conf', help = "Path to nodes.conf file.")
